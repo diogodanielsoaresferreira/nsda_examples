@@ -21,6 +21,7 @@
 # are within tolerance% of the median value, then the traffic is treated as a beacon.
 
 import sys
+import functools
 
 if len(sys.argv) >= 3:
     precision = int(sys.argv[1])
@@ -32,19 +33,26 @@ starting_epoch = -1
 if len(sys.argv) >= 4:
     starting_epoch = int(sys.argv[3])
 
-current_ip = ''
 
 def process_epoch_info(bins):
     a = bins.keys()
-    a.sort() 
+    a = sorted(a)
+
     distances = []
+
     # We create a table of distances between the bins
     for i in range(0, len(a) -1):
         distances.append(a[i + 1] - a[i])
 
     distances.sort()
-    median = distances(len(distances)/2)
-    tolerance_range = (median - tolerance * median, median + tolerance *median)
+
+    if distances != []:
+        median = functools.reduce(lambda x, y: x + y, distances) / len(distances)
+    else:
+        median = 0
+
+    tolerance_range = (median - tolerance * median, median + tolerance * median)
+
     # Now we check bins
     count = 0 
     for i in distances:
@@ -58,22 +66,44 @@ bins = {}    # Checklist of bins hit during construction; sorted and
 results = {} # Associate array containing the results of the binning
              # analysis, dumped during the final report
 
+# Timestamp of the selected bar
+bin_bar = 0
+
+# Last IP that is being evaluated
+last_ip = ''
+
 # We start reading in data; for each line I'm building a table of
 # beaconing events.  The beaconing events are simply indications that
 # traffic 'occurred' at time X.  The size of the traffic, how often it occurred,
 # how many flows is irrelevant.  Something happened, or it didnt.  
 for i in sys.stdin.readlines():
     ip, time = i.split('|')[0:2]
-    if ip != current_ip:
-        results[ip] = process_epoch_info(bins)
+    ip = ip.strip()
+    time = float(time)
+
+    # On the first run, the last ip is the first ip
+    if last_ip == '':
+        last_ip = ip
+
+    # Everytime the IP changes means that we can process
+    # the last ip in the bins
+    if ip != last_ip:
+        results[last_ip] = process_epoch_info(bins)
         bins = {}
             
     if starting_epoch == -1:
         starting_epoch = time - (time % 86400) # Sets it to midnight of that day
-    bin = (time - starting_epoch) / precision
-    bins[bin] = 1
 
-a = bins.sort()
-for i in a:
-    print "%15s|%5d|%5d|%8.4f" % (ip, bins[a][0], bins[a][1],
-                                  100.0 * (float(bins[a[0]])/float(bins[a[1]])))
+
+    last_ip = ip
+    bin_bar = int((time - starting_epoch) / precision)
+    bins[bin_bar] = 1
+
+results[last_ip] = process_epoch_info(bins)
+
+
+ips = results.keys()
+ips = sorted(ips)
+
+for ip in ips:
+    print(ip+": "+str(results[ip]))
