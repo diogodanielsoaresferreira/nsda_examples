@@ -20,11 +20,11 @@
 # the median value is used as representative of the distance.  If all the distances
 # are within tolerance% of the median value, then the traffic is treated as a beacon.
 
+from __future__ import division
 import sys
-import functools
 
 if len(sys.argv) >= 3:
-    precision = int(sys.argv[1])
+    precision = float(sys.argv[1])
     tolerance = float(sys.argv[2])
 else:
     sys.stderr.write("Specify the precision and tolerance\n")
@@ -47,7 +47,7 @@ def process_epoch_info(bins):
     distances.sort()
 
     if distances != []:
-        median = functools.reduce(lambda x, y: x + y, distances) / len(distances)
+        median = distances[len(distances)//2]
     else:
         median = 0
 
@@ -58,6 +58,7 @@ def process_epoch_info(bins):
     for i in distances:
         if (i >= tolerance_range[0]) and (i <= tolerance_range[1]):
             count+=1
+
     return count, len(distances)
 
 bins = {}    # Checklist of bins hit during construction; sorted and
@@ -106,4 +107,7 @@ ips = results.keys()
 ips = sorted(ips)
 
 for ip in ips:
-    print(ip+": "+str(results[ip]))
+    if results[ip][1]!=0:
+        print(ip+": "+str(results[ip]) + " -> " + str(round(results[ip][0]/results[ip][1], 2)))
+    else:
+        print(ip+": "+str(results[ip]) + " -> 0.00")
